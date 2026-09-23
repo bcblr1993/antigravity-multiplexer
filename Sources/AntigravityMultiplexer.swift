@@ -18,8 +18,25 @@ struct ManagedInstance: Identifiable, Hashable {
     var profile: String { isOriginal ? "~/.gemini" : "~/.gemini-\(max(index - 1, 1))" }
 }
 
+struct BackupBatch: Decodable, Identifiable {
+    let name: String
+    let archiveCount: Int
+    let bytes: Int64
+    let referenced: Bool
+    let deletable: Bool
+    var id: String { name }
+    var dateLabel: String {
+        let characters = Array(name)
+        guard characters.count == 22 else { return name }
+        return "\(String(characters[0..<4]))-\(String(characters[4..<6]))-\(String(characters[6..<8])) " +
+               "\(String(characters[9..<11])):\(String(characters[11..<13])):\(String(characters[13..<15]))"
+    }
+    var sizeLabel: String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
+}
+
 @MainActor final class InstanceStore: ObservableObject {
     @Published var instances: [ManagedInstance] = []
+    @Published var backups: [BackupBatch] = []
     @Published var busy = false
     @Published var output = ""
     @Published var error: String?
@@ -61,6 +78,7 @@ struct ManagedInstance: Identifiable, Hashable {
             sourceVersion = "未找到"
             compatibility = "需要官方原版"
         }
+        refreshBackups()
     }
 
     private func number(for name: String, bundle: String) -> Int {
@@ -74,8 +92,36 @@ struct ManagedInstance: Identifiable, Hashable {
     private func manifestPath(index: Int) -> URL { support.appendingPathComponent("instance-\(index).json") }
     var nextIndex: Int { max(8, (instances.map(\.index).filter { $0 < 10_000 }.max() ?? 7) + 1) }
     var pendingUpgrades: [ManagedInstance] { instances.filter { !$0.isOriginal && $0.version.compare(sourceVersion, options: .numeric) == .orderedAscending } }
-    var hasBackups: Bool { FileManager.default.fileExists(atPath: support.appendingPathComponent("Backups").path) }
+    func refreshBackups() {
+        guard let script = Bundle.main.url(forResource: "manage_backups", withExtension: "py") else {
+            backups = []; return
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = [script.path, "list"]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                backups = try JSONDecoder().decode([BackupBatch].self, from: data)
+            } else {
+                backups = []
+                if error == nil { error = "无法读取备份列表，请检查备份目录。" }
+            }
+        } catch { self.error = "无法读取备份列表：\(error.localizedDescription)" }
+    }
     func showBackups() { NSWorkspace.shared.open(support.appendingPathComponent("Backups")) }
+    func deleteBackup(_ batch: BackupBatch) {
+        guard !busy && batch.deletable else { return }
+        guard let script = Bundle.main.url(forResource: "manage_backups", withExtension: "py") else {
+            error = "应用缺少备份管理组件。"; return
+        }
+        runScript(script, arguments: ["delete", batch.name], starting: "正在删除选定备份批次…\n")
+    }
 
     func open(_ item: ManagedInstance) {
         NSWorkspace.shared.open(item.path)
@@ -198,6 +244,7 @@ struct ContentView: View {
     @StateObject private var store = InstanceStore()
     @State private var showCreate = false
     @State private var showUpgrade = false
+    @State private var showBackupManager = false
     @State private var showUpdateSettings = false
     @State private var destination = URL(fileURLWithPath: "/Applications")
     var body: some View {
@@ -217,8 +264,8 @@ struct ContentView: View {
                             .buttonStyle(.bordered).help("更新设置")
                         Button { store.refresh() } label: { Image(systemName: "arrow.clockwise") }
                             .buttonStyle(.bordered).help("刷新列表")
-                        Button { store.showBackups() } label: { Label("查看备份", systemImage: "externaldrive") }
-                            .buttonStyle(.bordered).disabled(!store.hasBackups)
+                        Button { store.refreshBackups(); showBackupManager = true } label: { Label("管理备份", systemImage: "externaldrive") }
+                            .buttonStyle(.bordered)
                         Button { showUpgrade = true } label: { Label("升级全部副本", systemImage: "arrow.up.circle") }
                             .buttonStyle(.bordered).disabled(store.busy || store.pendingUpgrades.isEmpty || store.compatibility != "已支持本机版本")
                         Button { showCreate = true } label: { Label("创建实例", systemImage: "plus") }
@@ -248,7 +295,7 @@ struct ContentView: View {
                     }
                     if store.busy || !store.output.isEmpty {
                         VStack(alignment: .leading, spacing: 9) {
-                            HStack { Text("创建记录").font(.system(size: 14, weight: .semibold)); Spacer()
+                            HStack { Text("操作记录").font(.system(size: 14, weight: .semibold)); Spacer()
                                 if store.busy { ProgressView().controlSize(.small) } }
                             Text(store.output).font(.system(size: 11, design: .monospaced))
                                 .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
@@ -319,6 +366,9 @@ struct ContentView: View {
         .sheet(isPresented: $showUpdateSettings) {
             UpdateSettingsView(updater: updaterController.updater)
         }
+        .sheet(isPresented: $showBackupManager) {
+            BackupManagementView(store: store)
+        }
         .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("好") { store.error = nil }
         } message: { Text(store.error ?? "") }
@@ -362,6 +412,77 @@ struct ContentView: View {
     private func detailRow(_ label: String, _ value: String) -> some View {
         HStack { Text(label).foregroundStyle(.secondary); Spacer(); Text(value).fontWeight(.medium) }
             .font(.system(size: 12))
+    }
+}
+
+private struct BackupManagementView: View {
+    @ObservedObject var store: InstanceStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var pendingDeletion: BackupBatch?
+    private var totalSize: String {
+        ByteCountFormatter.string(fromByteCount: store.backups.reduce(0) { $0 + $1.bytes }, countStyle: .file)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("升级备份").font(.system(size: 21, weight: .bold))
+                Spacer()
+                Button { store.refreshBackups() } label: { Image(systemName: "arrow.clockwise") }
+                    .help("刷新备份列表")
+            }
+            Text("\(store.backups.count) 个批次 · 共 \(totalSize)")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            if store.backups.isEmpty {
+                Text("还没有升级备份。")
+                    .foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(store.backups) { batch in
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(batch.dateLabel).font(.system(size: 14, weight: .semibold))
+                                    Text("\(batch.archiveCount) 个压缩包 · \(batch.sizeLabel)")
+                                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                                    if batch.referenced {
+                                        Text("当前升级记录引用此备份").font(.system(size: 11)).foregroundStyle(.orange)
+                                    }
+                                    if !batch.deletable {
+                                        Text("含非备份文件，请在访达检查").font(.system(size: 11)).foregroundStyle(.orange)
+                                    }
+                                }
+                                Spacer()
+                                Button("永久删除", role: .destructive) { pendingDeletion = batch }
+                                    .disabled(store.busy || !batch.deletable)
+                            }
+                            .padding(13).background(pane, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                }.frame(maxHeight: 350)
+            }
+            Text("只删除你选定的备份批次。删除后无法恢复；请先确认各副本的登录和项目正常。")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            if let error = store.error {
+                Text(error).font(.system(size: 12)).foregroundStyle(.red)
+            }
+            HStack {
+                Button("在访达中查看") { store.showBackups() }.disabled(store.backups.isEmpty)
+                Spacer()
+                Button("完成") { dismiss() }
+            }
+        }
+        .padding(24).frame(width: 570)
+        .alert("永久删除此备份？", isPresented: Binding(get: { pendingDeletion != nil },
+                                             set: { if !$0 { pendingDeletion = nil } })) {
+            Button("永久删除", role: .destructive) {
+                if let batch = pendingDeletion { store.deleteBackup(batch) }
+                pendingDeletion = nil
+            }
+            Button("取消", role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text("将删除 \(pendingDeletion?.dateLabel ?? "") 的整个备份批次，约 \(pendingDeletion?.sizeLabel ?? "0 B")。此操作无法撤销。")
+        }
     }
 }
 

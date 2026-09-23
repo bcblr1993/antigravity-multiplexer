@@ -31,10 +31,10 @@ APP_SUPPORT = pathlib.Path.home() / "Library/Application Support/Antigravity Mul
 
 
 @contextmanager
-def operation_lock():
+def operation_lock(support=APP_SUPPORT):
     """Serialize clone creation and upgrades across manager windows/processes."""
-    APP_SUPPORT.mkdir(parents=True, mode=0o700, exist_ok=True)
-    with open(APP_SUPPORT / "operation.lock", "a+") as handle:
+    support.mkdir(parents=True, mode=0o700, exist_ok=True)
+    with open(support / "operation.lock", "a+") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

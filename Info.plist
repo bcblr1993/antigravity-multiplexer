@@ -7,10 +7,18 @@
 <key>CFBundleIdentifier</key><string>dev.chenxu.antigravity-multiplexer</string>
 <key>CFBundleName</key><string>Antigravity 多开管理器</string>
 <key>CFBundleDisplayName</key><string>Antigravity 多开管理器</string>
-<key>CFBundleVersion</key><string>3</string>
-<key>CFBundleShortVersionString</key><string>0.2.1</string>
+<key>CFBundleVersion</key><string>4</string>
+<key>CFBundleShortVersionString</key><string>0.3.0</string>
 <key>CFBundleIconFile</key><string>Icon.icns</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+<key>SUFeedURL</key><string>https://github.com/bcblr1993/antigravity-multiplexer/releases/latest/download/appcast.xml</string>
+<key>SUPublicEDKey</key><string>pMww3oxkkT9VcymetHFOUIF1thb/n+xjVMlxuFXVHsY=</string>
+<key>SURequireSignedFeed</key><true/>
+<key>SUEnableAutomaticChecks</key><true/>
+<key>SUAutomaticallyUpdate</key><true/>
+<key>SUEnableSystemProfiling</key><false/>
+<key>SUScheduledCheckInterval</key><integer>86400</integer>
+<key>SUVerifyUpdateBeforeExtraction</key><true/>
 </dict></plist>

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Sparkle
 
 private let accent = Color(red: 0.31, green: 0.38, blue: 0.94)
 private let pane = Color(red: 0.965, green: 0.971, blue: 0.988)
@@ -193,9 +194,11 @@ struct InstanceCard: View {
 }
 
 struct ContentView: View {
+    let updaterController: SPUStandardUpdaterController
     @StateObject private var store = InstanceStore()
     @State private var showCreate = false
     @State private var showUpgrade = false
+    @State private var showUpdateSettings = false
     @State private var destination = URL(fileURLWithPath: "/Applications")
     var body: some View {
         ZStack { pane.ignoresSafeArea()
@@ -208,6 +211,10 @@ struct ContentView: View {
                                 .font(.system(size: 13)).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button { updaterController.checkForUpdates(nil) } label: { Label("检查更新", systemImage: "arrow.down.circle") }
+                            .buttonStyle(.bordered)
+                        Button { showUpdateSettings = true } label: { Image(systemName: "gearshape") }
+                            .buttonStyle(.bordered).help("更新设置")
                         Button { store.refresh() } label: { Image(systemName: "arrow.clockwise") }
                             .buttonStyle(.bordered).help("刷新列表")
                         Button { store.showBackups() } label: { Label("查看备份", systemImage: "externaldrive") }
@@ -309,6 +316,9 @@ struct ContentView: View {
                 }
             }.padding(24).frame(width: 520)
         }
+        .sheet(isPresented: $showUpdateSettings) {
+            UpdateSettingsView(updater: updaterController.updater)
+        }
         .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("好") { store.error = nil }
         } message: { Text(store.error ?? "") }
@@ -355,6 +365,41 @@ struct ContentView: View {
     }
 }
 
+private struct UpdateSettingsView: View {
+    let updater: SPUUpdater
+    @Environment(\.dismiss) private var dismiss
+    @State private var automatic = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("管理器更新").font(.system(size: 21, weight: .bold))
+            Toggle("自动检查、下载并安装更新", isOn: $automatic)
+                .onChange(of: automatic) { enabled in
+                    updater.automaticallyChecksForUpdates = enabled
+                    updater.automaticallyDownloadsUpdates = enabled
+                }
+            Text("开启后每天检查新版本。更新只替换多开管理器；实例和账号数据保留。需要授权时，macOS 会提示你。")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            HStack {
+                Button("立即检查") { updater.checkForUpdates(); dismiss() }
+                Spacer()
+                Button("完成") { dismiss() }
+            }
+        }
+        .padding(24).frame(width: 440)
+        .onAppear { automatic = updater.automaticallyChecksForUpdates && updater.automaticallyDownloadsUpdates }
+    }
+}
+
 @main struct AntigravityMultiplexerApp: App {
-    var body: some Scene { WindowGroup { ContentView().preferredColorScheme(.light) }.windowStyle(.titleBar).windowToolbarStyle(.unifiedCompact) }
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    var body: some Scene {
+        WindowGroup { ContentView(updaterController: updaterController).preferredColorScheme(.light) }
+            .windowStyle(.titleBar).windowToolbarStyle(.unifiedCompact)
+            .commands {
+                CommandGroup(after: .appInfo) {
+                    Button("检查多开管理器更新…") { updaterController.checkForUpdates(nil) }
+                }
+            }
+    }
 }

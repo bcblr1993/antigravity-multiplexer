@@ -162,6 +162,15 @@ struct BackupBatch: Decodable, Identifiable {
                   starting: "正在检查官方应用…\n")
     }
 
+    func destroy(_ item: ManagedInstance) {
+        guard !busy && !item.isOriginal && (2...9999).contains(item.index) else { return }
+        guard let script = Bundle.main.url(forResource: "destroy_instance", withExtension: "py") else {
+            error = "应用缺少实例销毁组件。"; return
+        }
+        runScript(script, arguments: ["--index", String(item.index), "--app", item.path.path],
+                  starting: "正在核对并销毁 \(item.name)…\n")
+    }
+
     private func runScript(_ script: URL, arguments: [String], starting: String) {
         busy = true
         error = nil
@@ -200,6 +209,7 @@ struct InstanceCard: View {
     let reveal: () -> Void
     let logs: () -> Void
     let verify: () -> Void
+    let destroy: () -> Void
     var body: some View {
         HStack(alignment: .center, spacing: 15) {
             ZStack {
@@ -229,6 +239,10 @@ struct InstanceCard: View {
                     Divider()
                     Button(item.verified ? "取消登录验证标记" : "标记已完成登录验证", action: verify)
                 }
+                if !item.isOriginal && (2...9999).contains(item.index) {
+                    Divider()
+                    Button("销毁实例…", role: .destructive, action: destroy)
+                }
             } label: { Image(systemName: "ellipsis").frame(width: 18, height: 18) }
                 .menuStyle(.borderlessButton).frame(width: 28)
             Button("打开", action: open).buttonStyle(.borderedProminent).tint(accent)
@@ -246,6 +260,7 @@ struct ContentView: View {
     @State private var showUpgrade = false
     @State private var showBackupManager = false
     @State private var showUpdateSettings = false
+    @State private var pendingDestroy: ManagedInstance?
     @State private var destination = URL(fileURLWithPath: "/Applications")
     var body: some View {
         ZStack { pane.ignoresSafeArea()
@@ -283,7 +298,8 @@ struct ContentView: View {
                     }
                     ForEach(store.instances) { item in
                         InstanceCard(item: item, sourceVersion: store.sourceVersion, open: { store.open(item) }, reveal: { store.reveal(item) },
-                                     logs: { store.showLogs(item) }, verify: { store.toggleVerified(item) })
+                                     logs: { store.showLogs(item) }, verify: { store.toggleVerified(item) },
+                                     destroy: { pendingDestroy = item })
                     }
                     if store.instances.isEmpty {
                         VStack(spacing: 7) {
@@ -369,6 +385,12 @@ struct ContentView: View {
         .sheet(isPresented: $showBackupManager) {
             BackupManagementView(store: store)
         }
+        .sheet(item: $pendingDestroy) { item in
+            DestroyInstanceView(item: item, busy: store.busy) {
+                store.destroy(item)
+                pendingDestroy = nil
+            }
+        }
         .alert("操作未完成", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
             Button("好") { store.error = nil }
         } message: { Text(store.error ?? "") }
@@ -412,6 +434,44 @@ struct ContentView: View {
     private func detailRow(_ label: String, _ value: String) -> some View {
         HStack { Text(label).foregroundStyle(.secondary); Spacer(); Text(value).fontWeight(.medium) }
             .font(.system(size: 12))
+    }
+}
+
+private struct DestroyInstanceView: View {
+    let item: ManagedInstance
+    let busy: Bool
+    let destroy: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmation = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("销毁 \(item.name)").font(.system(size: 21, weight: .bold))
+            Text("将永久删除所选副本的应用、独立账号资料、窗口数据、日志、登录文件及管理清单。主实例和其他副本不会删除；已有升级备份会保留。")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 7) {
+                Text(item.path.path)
+                Text(item.profile)
+                Text("~/Library/Application Support/\(item.name)")
+                Text("~/Library/Logs/\(item.name)")
+            }.font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(pane, in: RoundedRectangle(cornerRadius: 12))
+            if item.running {
+                Text("实例仍在运行。请先保存工作并退出，然后刷新列表重试。")
+                    .font(.system(size: 12)).foregroundStyle(.orange)
+            }
+            Text("此操作无法撤销。请输入完整实例名称以确认：\(item.name)")
+                .font(.system(size: 12))
+            TextField("实例名称", text: $confirmation)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }
+                Button("永久销毁", role: .destructive, action: destroy)
+                    .disabled(busy || item.running || confirmation != item.name)
+            }
+        }.padding(24).frame(width: 530)
     }
 }
 

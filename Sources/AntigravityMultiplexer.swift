@@ -103,7 +103,7 @@ struct ManagedInstance: Identifiable, Hashable {
             error = "应用缺少升级组件。"; return
         }
         runScript(script, arguments: ["--source", "/Applications/Antigravity.app"],
-                  starting: "正在检查全部实例及官方原版…\n")
+                  starting: "正在检查本机主实例和全部副本；此操作不下载程序…\n")
     }
 
     func create(index: Int, destination: URL) {
@@ -211,7 +211,7 @@ struct ContentView: View {
                                 .font(.system(size: 13)).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button { updaterController.checkForUpdates(nil) } label: { Label("检查更新", systemImage: "arrow.down.circle") }
+                        Button { updaterController.checkForUpdates(nil) } label: { Label("管理器更新", systemImage: "arrow.down.circle") }
                             .buttonStyle(.bordered)
                         Button { showUpdateSettings = true } label: { Image(systemName: "gearshape") }
                             .buttonStyle(.bordered).help("更新设置")
@@ -219,14 +219,14 @@ struct ContentView: View {
                             .buttonStyle(.bordered).help("刷新列表")
                         Button { store.showBackups() } label: { Label("查看备份", systemImage: "externaldrive") }
                             .buttonStyle(.bordered).disabled(!store.hasBackups)
-                        Button { showUpgrade = true } label: { Label("升级全部", systemImage: "arrow.up.circle") }
+                        Button { showUpgrade = true } label: { Label("升级全部副本", systemImage: "arrow.up.circle") }
                             .buttonStyle(.bordered).disabled(store.busy || store.pendingUpgrades.isEmpty || store.compatibility != "已支持本机版本")
                         Button { showCreate = true } label: { Label("创建实例", systemImage: "plus") }
                             .buttonStyle(.borderedProminent).tint(accent).disabled(store.busy)
                     }
                     HStack(spacing: 12) {
                         statusTile(title: "已发现实例", value: "\(store.instances.count)", symbol: "square.stack.3d.up")
-                        statusTile(title: "官方原版", value: store.sourceVersion, symbol: "checkmark.shield")
+                        statusTile(title: "本机主实例", value: store.sourceVersion, symbol: "checkmark.shield")
                         statusTile(title: "创建适配", value: store.compatibility, symbol: "wrench.adjustable")
                     }
                     HStack {
@@ -295,8 +295,8 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showUpgrade) {
             VStack(alignment: .leading, spacing: 17) {
-                Text("升级全部实例").font(.system(size: 21, weight: .bold))
-                Text("官方原版 v\(store.sourceVersion) · 待升级 \(store.pendingUpgrades.count) 个")
+                Text("从本机主实例升级全部副本").font(.system(size: 21, weight: .bold))
+                Text("/Applications/Antigravity.app · v\(store.sourceVersion) · 待升级 \(store.pendingUpgrades.count) 个")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -307,11 +307,11 @@ struct ContentView: View {
                         }
                     }.padding(16)
                 }.frame(maxHeight: 230).background(pane, in: RoundedRectangle(cornerRadius: 13))
-                Text("请先保存这些实例中的工作。工具会备份每个应用、账号目录和窗口数据，然后逐个安装新版；账号目录保持原路径。")
+                Text("直接复制本机主实例，不从网络下载安装包。请先保存这些副本中的工作。工具会备份每个应用、账号目录和窗口数据，再逐个安装适配后的副本；账号目录保持原路径。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                 HStack { Spacer()
                     Button("取消") { showUpgrade = false }
-                    Button("备份并升级") { store.upgradeAll(); showUpgrade = false }
+                    Button("从主实例复制并升级") { store.upgradeAll(); showUpgrade = false }
                         .buttonStyle(.borderedProminent).tint(accent)
                 }
             }.padding(24).frame(width: 520)

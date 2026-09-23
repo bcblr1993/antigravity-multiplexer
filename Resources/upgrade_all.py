@@ -16,7 +16,7 @@ import time
 from datetime import datetime
 
 from create_instance import (APP_SUPPORT, KNOWN, digest, patch_asar, replace_once,
-                             require, run, sign_bundle)
+                             require, run, sign_bundle, operation_lock)
 
 KEY_PATTERN = re.compile(rb"[a-z0-9-]{6}-standalone-oauth-token")
 WORDS = {"Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5, "Sixth": 6, "Seventh": 7}
@@ -156,7 +156,7 @@ def upgrade_all(source, dry_run=False, only_indices=None, build_only=False):
     version = source_info(source)
     instances = discover()
     pending = [item for item in instances if version_tuple(item["version"]) < version_tuple(version) and (only_indices is None or item["index"] in only_indices)]
-    print(f"官方原版：{version}；发现 {len(instances)} 个副本；待升级 {len(pending)} 个", flush=True)
+    print(f"本机主实例：{version}；发现 {len(instances)} 个副本；待升级 {len(pending)} 个", flush=True)
     for item in pending:
         print(f"  {item['name']}: {item['version']} → {version}", flush=True)
     if dry_run or not pending:
@@ -172,7 +172,7 @@ def upgrade_all(source, dry_run=False, only_indices=None, build_only=False):
             target = staging / f"{name}.app"
             signing_dir = staging / f"sign-{item['index']}"
             signing_dir.mkdir()
-            print(f"构建并验证：{name}", flush=True)
+            print(f"从主实例本地复制、适配并验签：{name}", flush=True)
             scheme = build(source, target, item, version, signing_dir)
             built.append((item, target, scheme))
         if build_only:
@@ -223,9 +223,10 @@ def main():
     parser.add_argument("--build-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
-        upgrade_all(args.source.resolve(), args.dry_run,
-                    {int(value) for value in args.only_indices.split(",")} if args.only_indices else None,
-                    args.build_only)
+        with operation_lock():
+            upgrade_all(args.source.resolve(), args.dry_run,
+                        {int(value) for value in args.only_indices.split(",")} if args.only_indices else None,
+                        args.build_only)
     except Exception as error:
         print(f"批量升级失败：{error}", file=sys.stderr, flush=True)
         sys.exit(1)

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Create one local, version-pinned Antigravity instance from the installed original."""
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -26,6 +28,21 @@ KNOWN = {
     }
 }
 APP_SUPPORT = pathlib.Path.home() / "Library/Application Support/Antigravity Multiplexer"
+
+
+@contextmanager
+def operation_lock():
+    """Serialize clone creation and upgrades across manager windows/processes."""
+    APP_SUPPORT.mkdir(parents=True, mode=0o700, exist_ok=True)
+    with open(APP_SUPPORT / "operation.lock", "a+") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("已有实例创建或升级正在执行，请等待完成后重试") from error
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def digest(path):
@@ -253,7 +270,8 @@ def main():
     parser.add_argument("--destination", type=pathlib.Path, required=True)
     args = parser.parse_args()
     try:
-        create(args.index, args.source.resolve(), args.destination.resolve())
+        with operation_lock():
+            create(args.index, args.source.resolve(), args.destination.resolve())
     except Exception as error:
         print(f"创建失败：{error}", file=sys.stderr, flush=True)
         sys.exit(1)

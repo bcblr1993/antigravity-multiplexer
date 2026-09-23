@@ -7,8 +7,8 @@
 <key>CFBundleIdentifier</key><string>dev.chenxu.antigravity-multiplexer</string>
 <key>CFBundleName</key><string>Antigravity 多开管理器</string>
 <key>CFBundleDisplayName</key><string>Antigravity 多开管理器</string>
-<key>CFBundleVersion</key><string>4</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
+<key>CFBundleVersion</key><string>5</string>
+<key>CFBundleShortVersionString</key><string>0.3.1</string>
 <key>CFBundleIconFile</key><string>Icon.icns</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>

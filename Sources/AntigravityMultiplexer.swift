@@ -70,7 +70,7 @@ struct BackupBatch: Decodable, Identifiable {
                 let manifest = manifestPath(index: index)
                 let record = (try? Data(contentsOf: manifest)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
                 let verified = record?["login_verified"] as? Bool ?? false
-                let running = !NSRunningApplication.runningApplications(withBundleIdentifier: bundle).isEmpty
+                let running = isInstanceRunning(bundleID: bundle, path: app)
                 found.append(ManagedInstance(id: bundle, name: name, path: app, bundleID: bundle,
                                              version: version, index: index, running: running, verified: verified))
             }
@@ -84,6 +84,22 @@ struct BackupBatch: Decodable, Identifiable {
             compatibility = "需要官方原版"
         }
         refreshBackups()
+    }
+
+    private func isInstanceRunning(bundleID: String, path: URL) -> Bool {
+        let expected = path.resolvingSymlinksInPath().standardizedFileURL
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).contains { app in
+            !app.isTerminated && app.bundleURL?.resolvingSymlinksInPath().standardizedFileURL == expected
+        }
+    }
+
+    func refreshRunningStates() {
+        let updated = instances.map { item in
+            ManagedInstance(id: item.id, name: item.name, path: item.path, bundleID: item.bundleID,
+                            version: item.version, index: item.index,
+                            running: isInstanceRunning(bundleID: item.bundleID, path: item.path), verified: item.verified)
+        }
+        if updated != instances { instances = updated }
     }
 
     private func number(for name: String, bundle: String) -> Int {
@@ -327,6 +343,18 @@ struct ContentView: View {
         }
         .frame(minWidth: 760, minHeight: 590)
         .onAppear { store.refresh() }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { _ in
+            store.refreshRunningStates()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { _ in
+            store.refreshRunningStates()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            store.refreshRunningStates()
+        }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            store.refreshRunningStates()
+        }
         .sheet(isPresented: $showCreate) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {

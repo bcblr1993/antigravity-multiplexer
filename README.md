@@ -1,4 +1,4 @@
-# Antigravity 多开管理器 0.3.4
+# Antigravity 多开管理器 0.3.5
 
 适用：Apple Silicon（M 系列）Mac，macOS 13 或更新版本。本工具是本机图形化管理器；安装包不包含 Google Antigravity 程序。
 

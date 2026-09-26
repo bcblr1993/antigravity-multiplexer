@@ -1,0 +1,17 @@
+{
+  "2.16.0": {
+    "asar": "053e8dce84698f8dc295ba7caa9d1e3879e49da3f63a9b54159eef43d607e24e",
+    "language_server": "43e9b0842df235fb269c85e7e31ad768dd44a3885f30630d9d9f208a1776a273",
+    "keyring_bypass_offset": 29624672
+  },
+  "2.15.1": {
+    "asar": "0f81685e9836ddf5a382869bea348385650cfe1bfeecbd2e2d902a571ce57261",
+    "language_server": "46a296d040163fd311948fbcb3ff0c9fb4ebf153083b4c17a89039e64fe85354",
+    "keyring_bypass_offset": 29365472
+  },
+  "2.17.0": {
+    "asar": "85c97057c762f01fe9fa8b0380f8055ff76344ceb47c840cd3d8d43aa035142b",
+    "language_server": "fea870aa9b5f2cd5689c46ece45517e31f5f6b02d56560e4dd39dda2f2b526a7",
+    "keyring_bypass_offset": 25412448
+  }
+}

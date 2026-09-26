@@ -44,7 +44,12 @@ struct BackupBatch: Decodable, Identifiable {
     @Published var compatibility = "检查中"
     private let support = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/Antigravity Multiplexer")
-    private let knownASAR = "0f81685e9836ddf5a382869bea348385650cfe1bfeecbd2e2d902a571ce57261"
+    private let supportedVersions: Set<String> = {
+        guard let url = Bundle.main.url(forResource: "compatibility", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let records = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+        return Set(records.keys)
+    }()
     private let names = ["Second": 2, "Third": 3, "Fourth": 4, "Fifth": 5, "Sixth": 6, "Seventh": 7, "Eighth": 8]
 
     func refresh() {
@@ -73,7 +78,7 @@ struct BackupBatch: Decodable, Identifiable {
         instances = found.sorted { $0.index < $1.index }
         if let source = instances.first(where: { $0.isOriginal }) {
             sourceVersion = source.version
-            compatibility = ["2.15.1", "2.16.0"].contains(source.version) ? "已支持本机版本" : "版本待适配"
+            compatibility = supportedVersions.contains(source.version) ? "已支持本机版本" : "版本待适配"
         } else {
             sourceVersion = "未找到"
             compatibility = "需要官方原版"
@@ -289,7 +294,7 @@ struct ContentView: View {
                     HStack(spacing: 12) {
                         statusTile(title: "已发现实例", value: "\(store.instances.count)", symbol: "square.stack.3d.up")
                         statusTile(title: "本机主实例", value: store.sourceVersion, symbol: "checkmark.shield")
-                        statusTile(title: "创建适配", value: store.compatibility, symbol: "wrench.adjustable")
+                        statusTile(title: "创建/升级适配", value: store.compatibility, symbol: "wrench.adjustable")
                     }
                     HStack {
                         Text("本机实例").font(.system(size: 16, weight: .semibold))

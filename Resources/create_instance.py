@@ -15,18 +15,8 @@ import sys
 import tempfile
 import uuid
 
-KNOWN = {
-    "2.16.0": {
-        "asar": "053e8dce84698f8dc295ba7caa9d1e3879e49da3f63a9b54159eef43d607e24e",
-        "language_server": "43e9b0842df235fb269c85e7e31ad768dd44a3885f30630d9d9f208a1776a273",
-        "keyring_bypass_offset": 0x1c40960,
-    },
-    "2.15.1": {
-        "asar": "0f81685e9836ddf5a382869bea348385650cfe1bfeecbd2e2d902a571ce57261",
-        "language_server": "46a296d040163fd311948fbcb3ff0c9fb4ebf153083b4c17a89039e64fe85354",
-        "keyring_bypass_offset": 0x1c014e0,
-    }
-}
+KNOWN = json.loads(pathlib.Path(__file__).with_name("compatibility.json").read_text())
+
 APP_SUPPORT = pathlib.Path.home() / "Library/Application Support/Antigravity Multiplexer"
 
 

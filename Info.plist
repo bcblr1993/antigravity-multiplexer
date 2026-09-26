@@ -13,7 +13,7 @@
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
-<key>SUFeedURL</key><string>https://github.com/bcblr1993/antigravity-multiplexer/releases/latest/download/appcast.xml</string>
+<key>SUFeedURL</key><string>https://aethernative.com/apps/antigravity-multiplexer/appcast.xml</string>
 <key>SUPublicEDKey</key><string>pMww3oxkkT9VcymetHFOUIF1thb/n+xjVMlxuFXVHsY=</string>
 <key>SURequireSignedFeed</key><true/>
 <key>SUEnableAutomaticChecks</key><true/>

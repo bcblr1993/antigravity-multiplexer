@@ -44,6 +44,6 @@ export NOTARY_PROFILE='your-notarytool-profile'
 ./scripts/package-release.sh
 ```
 
-脚本会构建 Apple Silicon 应用、签名、公证、附加票据并生成 `dist/` 下的 ZIP、`appcast.xml` 与 `SHA256SUMS.txt`。将版本提交并打 `v版本号` 标签后，把这三个文件上传到同版本 GitHub Release；先用草稿验证下载与校验和，再公开发布，确保该 Release 是最新正式版。应用从 `releases/latest/download/appcast.xml` 读取更新清单。不要把私钥或公证凭据提交到仓库；仅公开签名公钥。
+脚本会构建 Apple Silicon 应用、签名、公证、附加票据并生成 `dist/` 下的 ZIP、`appcast.xml` 与 `SHA256SUMS.txt`。将版本提交并打 `v版本号` 标签后，把这三个文件上传到同版本 GitHub Release；先用草稿验证下载与校验和，再公开发布，确保该 Release 是最新正式版。应用从 `https://aethernative.com/apps/antigravity-multiplexer/appcast.xml` 读取更新清单：发布 Release 后，`aethernative-sync` 工作流通知官网，官网校验签名后逐字节转发 Release 附件中的 `appcast.xml`，因此仍需把它上传到 Release。不要把私钥或公证凭据提交到仓库；仅公开签名公钥。
 
 本仓库不包含 Google Antigravity 程序，也不提供任何账号、凭据或用户数据。仅公开可审阅的管理器源码；第三方软件和标识的权利属于各自所有者。
